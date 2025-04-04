@@ -1,0 +1,48 @@
+# Node (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python (backend)
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+backend/.env
+backend/instance/
+
+# VSCode
+.vscode/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Docker
+**/docker-compose.override.yml
+**/.docker/
+
+# Mac/Linux swap/lock/temp files
+*.swp
+*.swo
+*.lock
+
+# Windows batch files backup
+*.bat~
+*.ps1~
+
+# Python egg
+*.egg-info/
+
+# Neo4j 
+*.dump
+*.db
+
+# Ignore Ollama downloaded models 
+ollama/

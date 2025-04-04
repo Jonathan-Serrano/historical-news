@@ -1,1 +1,65 @@
-# historical-news
+# Historical News
+
+A full-stack web application built with:
+
+- Vue.js (TypeScript + Tailwind) frontend
+- Flask backend (Python)
+- Local LLMs via [Ollama](https://ollama.com/)
+- Knowledge grounding using [Neo4j](https://neo4j.com/)
+- LangChain-powered GenAI applications with open-source [LLaMA](https://ollama.com/library/llama3) models
+
+---
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+)
+- [Python](https://www.python.org/downloads/) (v3.10+)
+- [Ollama](https://ollama.com/download)
+- [Neo4j Desktop or Aura](https://neo4j.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+
+---
+
+## Getting Started
+
+### 1. Clone the Repository
+### 2. Setup Backend
+
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate         # On Windows
+# Or: source venv/bin/activate  (Linux/macOS)
+
+pip install -r requirements.txt
+python app.py
+```
+
+```bash
+cd backend
+docker compose up -d
+```
+
+```bash
+# Remember to download OLLAMA at https://ollama.com/download 
+ollama run llama3
+```
+### 3. Setup Frontend 
+```bash
+cd frontend
+npm install
+npm run dev
+```
+### 4. Setup environment variables
+- Create a `.env` file in the `backend` directory.
+- Add the following variables:
+
+```env
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
+
+LLM_MODEL=llama3
+PORT=5000
+``` 
+
