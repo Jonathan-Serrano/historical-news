@@ -77,7 +77,7 @@ PORT=5000
 VITE_API_URL=http://127.0.0.1:5000/
 ``` 
 
-Make sure to end docker compose and comila:
+Make sure to end docker compose and comila when closing the project:
 ```bash
 docker-compose down
 colima stop
