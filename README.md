@@ -63,3 +63,9 @@ LLM_MODEL=llama3
 PORT=5000
 ``` 
 
+- Create a `.env` file in the `frontend` directory.
+- Add the following variable:
+
+```env
+VITE_API_URL=http://127.0.0.1:5000/
+``` 
