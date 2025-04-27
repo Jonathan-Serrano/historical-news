@@ -40,6 +40,13 @@ cd backend
 docker compose up -d
 ```
 
+If you are using Comila, you need to do these steps 
+```bash
+colima start 
+install docker-compose
+docker-compose up -d   
+```
+
 ```bash
 # Remember to download OLLAMA at https://ollama.com/download 
 ollama run llama3
@@ -69,3 +76,9 @@ PORT=5000
 ```env
 VITE_API_URL=http://127.0.0.1:5000/
 ``` 
+
+Make sure to end docker compose and comila:
+```bash
+docker-compose down
+colima stop
+```
