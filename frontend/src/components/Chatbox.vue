@@ -9,7 +9,7 @@
         {{ selectedOption }}
       </button>
       <ul v-if="dropdownOpen" class="absolute bg-gray-900 border mt-1 w-full">
-        <li v-for="option in options" :key="option" @click="selectOption(option)" class="p-2 hover:bg-gray-100 cursor-pointer">
+        <li v-for="option in options" :key="option" @click="selectOption(option)" class="p-2 hover:bg-gray-700 cursor-pointer">
           {{ option }}
         </li>
       </ul>
