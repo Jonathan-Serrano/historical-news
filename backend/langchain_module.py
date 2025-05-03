@@ -1,7 +1,7 @@
 import os
 from langchain.chains import ConversationChain
 from langchain_community.llms import Ollama
-from neo4j_connector import get_context
+from backend.neo4j_loader import get_context
 
 llm = Ollama(model=os.getenv("OLLAMA_MODEL"))
 
