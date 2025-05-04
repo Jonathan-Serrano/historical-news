@@ -46,3 +46,12 @@ Thumbs.db
 
 # Ignore Ollama downloaded models 
 ollama/
+backend/data.csv
+backend/topic_data.csv
+backend/data_extraction/memento_data/bertopic_topics_renamed.csv
+backend/data_extraction/memento_data/bertopic_topics.csv
+backend/data_extraction/memento_data/html_results.csv
+backend/data_extraction/memento_data/topic_results copy.csv
+backend/data_extraction/memento_data/topic_results_renamed.csv
+backend/data_extraction/memento_data/bertopic_topics.csv
+backend/data_extraction/memento_data/bertopic_topics.csv

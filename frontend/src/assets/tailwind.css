@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+@import "tailwindcss-primeui";
+
+:root {
+  --bg-body: #f8fafc; /* Tailwind's gray-50 */
+  --text-primary: #1f2937; /* Tailwind's gray-800 */
+  --text-secondary: #4b5563; /* Tailwind's gray-600 */
+  --bg-card: #ffffff; /* White */
+  --border-color: #e5e7eb; /* Tailwind's gray-200 */
+}
+
