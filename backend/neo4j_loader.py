@@ -39,12 +39,6 @@ def insert_csv_data(data: pd.DataFrame):
     for index, row in data.iterrows():
         topic_names = row["assigned_topic_name"].split(", ") if row["assigned_topic_name"] else []
 
-        # Merge User node
-        query_user = """
-        MERGE (user:User {id: $user_id})
-        """
-        neo4j_graph.query(query_user, {"user_id": row["author"]})
-
         # Merge Channel node
         query_channel = """
         MERGE (channel:Channel {title: $channel_title})
@@ -80,18 +74,7 @@ def insert_csv_data(data: pd.DataFrame):
         MERGE (author:Author {name: $author_name})
         """
         neo4j_graph.query(query_author, {"author_name": row["author"]})
-
-        # # Create relationships
-        # # User subscribes to Topic
-        # query_subscribe = """
-        # MATCH (user:User {id: $user_id}), (topic:Topic {name: $topic_name})
-        # MERGE (user)-[:SUBSCRIBED_TO]->(topic)
-        # """
-        # neo4j_graph.query(
-        #     query_subscribe,
-        #     {"user_id": row["author"], "topic_name": row["assigned_topic_name"]},
-        # )
-
+        
         # Article is written by Author
         query_written_by = """
         MATCH (article:Article {link: $article_link}), (author:Author {name: $author_name})
@@ -146,12 +129,12 @@ def insert_topic_data(topic_df: pd.DataFrame):
         )
 
 
-# csv_data = pd.read_csv("data.csv")
-# csv_data = csv_data.fillna("")
-# csv_data["pubDate"] = pd.to_datetime(csv_data["pubDate"], errors="coerce", utc=True)
-# print("CSV data shape:", csv_data.shape)
-# create_constraints(neo4j_graph)
-# insert_csv_data(csv_data)
+csv_data = pd.read_csv("data.csv")
+csv_data = csv_data.fillna("")
+csv_data["pubDate"] = pd.to_datetime(csv_data["pubDate"], errors="coerce", utc=True)
+print("CSV data shape:", csv_data.shape)
+create_constraints(neo4j_graph)
+insert_csv_data(csv_data)
 
 topic_names = pd.read_csv("topic_data.csv")
 topic_names = topic_names.fillna("")

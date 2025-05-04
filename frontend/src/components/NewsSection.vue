@@ -26,11 +26,12 @@
         <Button
           v-for="(topic, index) in suggestedTopics"
           :key="index"
-          label="Add {{ topic }}"
+          :label="topic"
           @click="confirmAddTopic(topic)"
         />
       </div>
     </section>
+    <ConfirmPopup />
   </section>
 </template>
 

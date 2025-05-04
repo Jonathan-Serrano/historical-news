@@ -55,3 +55,4 @@ backend/data_extraction/memento_data/topic_results copy.csv
 backend/data_extraction/memento_data/topic_results_renamed.csv
 backend/data_extraction/memento_data/bertopic_topics.csv
 backend/data_extraction/memento_data/bertopic_topics.csv
+backend/data_extraction/memento_data/bertopic_topics.csv

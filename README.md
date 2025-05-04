@@ -74,7 +74,7 @@ PORT=5000
 - Add the following variable:
 
 ```env
-VITE_API_URL=http://127.0.0.1:5000/
+FLASK_API_URL=http://127.0.0.1:5000/
 ``` 
 
 Make sure to end docker compose and comila when closing the project:
