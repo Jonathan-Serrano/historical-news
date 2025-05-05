@@ -1,10 +1,12 @@
 import os
-import requests
 import pandas as pd
 from dotenv import load_dotenv
+from neo4j.exceptions import ClientError
+from tqdm import tqdm
 from langchain_neo4j import Neo4jGraph
-from datetime import datetime
-import json
+from langchain_text_splitters import TokenTextSplitter
+from langchain_ollama import OllamaEmbeddings, ChatOllama
+from langchain.prompts import ChatPromptTemplate
 
 load_dotenv()
 
@@ -16,6 +18,21 @@ password = os.getenv("NEO4J_PASSWORD")
 neo4j_graph = Neo4jGraph(
     url=url, username=username, password=password, refresh_schema=False
 )
+
+embeddings = OllamaEmbeddings(model="mistral:instruct")
+embedding_dimension = 4096
+# llm = ChatOllama(model="mistral:instruct", temperature=0.7, num_predict=256)
+# summary_prompt = ChatPromptTemplate.from_messages(
+#     [
+#         (
+#             "system",
+#             "You are generating concise and accurate summaries based on the information found in the text.",
+#         ),
+#         ("human", "Generate a summary of the following input: {question}\nSummary:"),
+#     ]
+# )
+
+# summary_chain = summary_prompt | llm
 
 def create_constraints(graph: Neo4jGraph):
     constraints = [
@@ -36,7 +53,9 @@ def create_constraints(graph: Neo4jGraph):
 
 
 def insert_csv_data(data: pd.DataFrame):
-    for index, row in data.iterrows():
+    for index, row in tqdm(
+        data.iterrows(), total=len(data), desc="Inserting Data", unit="row"
+    ):
         topic_names = row["assigned_topic_name"].split(", ") if row["assigned_topic_name"] else []
 
         # Merge Channel node
@@ -53,28 +72,63 @@ def insert_csv_data(data: pd.DataFrame):
             },
         )
 
-        # Merge Article node
-        query_article = """
-        MERGE (article:Article {link: $article_link})
-        ON CREATE SET article.title = $article_title, article.description = $article_description,
-                      article.pubDate = datetime($pub_date)
-        """
-        neo4j_graph.query(
-            query_article,
-            {
-                "article_link": row["link"],
-                "article_title": row["title"],
-                "article_description": row["description"],
-                "pub_date": row["pubDate"],
-            },
+        # Using f-strings for cleaner string concatenation
+        article_text = (
+            f"{row.get('title', '')} {row.get('description', '')}".strip()
         )
 
+        # summary = summary_chain.invoke({"question": article_text}).content
+        # summary_embedding = embeddings.embed_query(summary)
+
+        article_embedding = embeddings.embed_query(article_text)
+        params = {
+            "article_link": row["link"],
+            "article_title": row["title"],
+            "article_description": row["description"],
+            "pub_date": row["pubDate"],
+            "article_text": article_text,
+            "article_embedding": article_embedding, 
+        }
+
+        # Updated query to save article with its embedding
+        query_article_and_embedding = """
+            MERGE (article:Article {link: $article_link})
+            ON CREATE SET 
+                article.title = $article_title, 
+                article.description = $article_description,
+                article.pubDate = datetime($pub_date)
+            SET 
+                article.text = $article_text
+
+            WITH article, $article_embedding AS embedding
+            CALL db.create.setNodeVectorProperty(article, 'embedding', embedding)
+            RETURN article
+        """
+        neo4j_graph.query(query_article_and_embedding, params)
+
+        # Ensure that an index exists on the article embeddings
+        try:
+            neo4j_graph.query(
+                """
+                CREATE VECTOR INDEX IF NOT EXISTS article_vectors
+                FOR (n:Article)
+                ON (n.embedding)
+                OPTIONS {indexConfig: {
+                    'vector.dimensions': $dimension,
+                    'vector.similarity_function': 'cosine'
+                }}
+                """,
+                {"dimension": embedding_dimension},
+            )
+        except ClientError:
+            pass
+        
         # Merge Author node
         query_author = """
         MERGE (author:Author {name: $author_name})
         """
         neo4j_graph.query(query_author, {"author_name": row["author"]})
-        
+
         # Article is written by Author
         query_written_by = """
         MATCH (article:Article {link: $article_link}), (author:Author {name: $author_name})

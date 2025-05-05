@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import Chip from 'primevue/chip';
 import Dropdown from 'primevue/dropdown';
@@ -55,19 +55,10 @@ import Button from 'primevue/button';
 import Slider from 'primevue/slider';
 import DatePicker from 'primevue/datepicker'; 
 import AutoComplete from 'primevue/AutoComplete';
+import { useUser } from '../composables/useUser';
+const { user, levels, understandingValue, fetchUserData } = useUser();
 
 const apiUrl = import.meta.env.VITE_API_URL;
-
-const user = ref({
-  id: 'user123',
-  name: 'John Doe',
-  baseUnderstanding: 'Intermediate',
-  joinDate: new Date('2025-05-04T00:00:00Z'),
-  interests: [] as { topic: string; level: string }[]
-});
-
-const levels = ['Beginner', 'Intermediate', 'Expert'];
-const understandingValue = ref(levels.indexOf(user.value.baseUnderstanding));
 
 const filteredInterests = ref([] as string[]);        
 const newInterest = ref(""); 
@@ -93,44 +84,6 @@ async function fetchAllInterests() {
   } catch (error) {
     console.error('Error fetching interests:', error);
     return [];
-  }
-}
-
-async function fetchUserData() {
-  try {
-    const response = await axios.get(`${apiUrl}/user?id=${user.value.id}`);
-    if (response.data) {
-      console.log('User data fetched:', response.data);
-      user.value = {
-        baseUnderstanding: response.data.base_understanding,
-        id: response.data.id,
-        name: response.data.name,
-        interests: response.data.interests.map((interest: any) => ({
-          topic: interest.topic,
-          level: interest.level
-        })),
-        joinDate: new Date(response.data.join_date)
-      };
-    } else {
-      await createUser();
-    }
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-  }
-}
-
-async function createUser() {
-  try {
-    const response = await axios.post(`${apiUrl}/user`, {
-      id: user.value.id,
-      name: user.value.name,
-      base_understanding: user.value.baseUnderstanding,
-      join_date: user.value.joinDate
-    });
-    console.log(response.data.message); 
-    fetchUserData();
-  } catch (error) {
-    console.error('Error creating user:', error);
   }
 }
 
@@ -162,24 +115,6 @@ async function removeInterest(index: number) {
   }
 }
 
-async function updateUser() {
-  try {
-    await axios.put(`${apiUrl}/user`, {
-      id: user.value.id,
-      name: user.value.name,
-      base_understanding: levels[understandingValue.value],
-      join_date: user.value.joinDate
-    });
-  } catch (error) {
-    console.error('Error updating user info:', error);
-  }
-}
-
-watch([understandingValue, user], updateUser, { deep: true });
-watch(() => user.value.baseUnderstanding, (newBaseUnderstanding) => {
-  console.log('Base understanding changed:', newBaseUnderstanding);
-  understandingValue.value = levels.indexOf(newBaseUnderstanding);
-});
 onMounted(() => {
   fetchUserData();
   fetchAllInterests();

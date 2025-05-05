@@ -2,9 +2,9 @@
   <section class="bg-card p-4 rounded shadow mt-20">
     <h2 class="text-xl font-bold mb-4 text-text-primary">Welcome, {{ user.name }}!</h2>
     <Menubar :model="menuItems" class="mb-4" />
-    <section class="mb-6">
+    <section class="mb-6" v-if="currentInterest.topic">
       <h3 class="text-lg font-semibold mb-2">While you were away ...</h3>
-      <p class="mb-2">{{ user.name }} understands {{ currentTopic }} at level {{ currentLevel }}</p>
+      <Message severity="info" class="mb-2">{{ user.name }} understands {{ currentInterest.topic }} at level {{ currentInterest.level }}</Message>
       <p class="mb-4">{{ summary }}</p>
       <Accordion :activeIndex="0">
         <AccordionTab v-for="(newsItem, index) in news" :key="index" :header="newsItem.title">
@@ -36,22 +36,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { user } from '../data/user';
-import { news, historicalNews, summary, historicalSummary, suggestedTopics } from '../data/news';
+import { computed, ref } from 'vue';
+import { historicalNews, historicalSummary, suggestedTopics } from '../data/news';
 import Menubar from 'primevue/menubar';
 import Accordion from 'primevue/accordion';
 import AccordionTab from 'primevue/accordiontab';
 import Button from 'primevue/button';
 import ConfirmPopup from 'primevue/confirmpopup';
 import { useConfirm } from 'primevue/useconfirm';
+import { useUser } from '../composables/useUser';
+import Message from 'primevue/message';
+import { useInterest } from '../composables/useInterest';
+import { useCurrentDate } from '../composables/useDate';
 
-const currentTopic = ref(user.interests[0]?.topic || 'General');
-const currentLevel = ref(user.interests[0]?.level || 'Beginner');
 
-const menuItems = user.interests.map((interest) => ({
-  label: interest.topic,
-}));
+const { user } = useUser();
+const { currentInterest, setCurrentInterest, fetchTopicSummary, fetchRelatedArticles } = useInterest();
+const { currentDate } = useCurrentDate();
+const summary = ref('');
+const news = ref<{ title: string; summary: string; url: string }[]>([]);
+
+const menuItems = computed(() => {
+  return user.value.interests.map((interest) => ({
+    label: interest.topic,
+    icon: 'pi pi-fw pi-tag',
+    command: () => {
+      setCurrentInterest(interest.topic, interest.level);
+      fetchTopicSummary().then((result) => {
+        summary.value = result;
+      });
+      if (currentDate.value) {
+        fetchRelatedArticles(currentDate.value).then((result) => {
+          news.value = result;
+        });
+      }
+    },
+  }));
+});
 
 const confirm = useConfirm();
 
@@ -65,7 +86,10 @@ function confirmAddTopic(topic: string) {
     header: 'Confirmation',
     icon: 'pi pi-exclamation-triangle',
     accept: () => {
-      user.interests.push({ topic, level: 'Beginner' });
+      user.value.interests = [
+        ...user.value.interests,
+        { topic, level: user.value.baseUnderstanding },
+      ];
     },
   });
 }

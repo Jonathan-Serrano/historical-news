@@ -6,6 +6,9 @@ from neo4j.time import DateTime as Neo4jDateTime
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain.prompts import ChatPromptTemplate
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -20,6 +23,34 @@ neo4j_graph = Neo4jGraph(
 app = Flask(__name__)
 api = Api(app)
 CORS(app)
+
+
+current_date = datetime(2024, 5, 5, 14, 30)
+
+
+class DateResource(Resource):
+    def get(self):
+        return make_response(jsonify({"current_date": current_date.isoformat()}), 200)
+
+    def put(self):
+        data = request.json
+        new_date = data.get("current_date")
+
+        if new_date:
+            try:
+                # Validate and parse the new date
+                parsed_date = datetime.fromisoformat(new_date)
+                global current_date
+                current_date = parsed_date
+                return make_response(
+                    jsonify({"message": "Date updated successfully!"}), 200
+                )
+            except ValueError:
+                return make_response(jsonify({"message": "Invalid date format!"}), 400)
+        else:
+            return make_response(jsonify({"message": "No date provided!"}), 400)
+
+api.add_resource(DateResource, "/date")
 
 class UserResource(Resource):
     def post(self):
@@ -186,6 +217,105 @@ api.add_resource(UserResource, "/user")
 api.add_resource(UserInterestResource, "/user/<string:user_id>/interest")
 api.add_resource(UserArticleResource, "/user/<string:user_id>/article")
 api.add_resource(InterestResource, "/interests")
+
+class ArticleTopicResource(Resource):
+    def get(self):
+        topic = request.args.get('topic')
+        before_date = request.args.get('before_date')
+
+        if not topic or not before_date:
+            return make_response(jsonify({"error": "Missing 'topic' or 'before_date' parameter"}), 400)
+
+        try:
+            # Ensure before_date is a valid ISO format date string
+            datetime.strptime(before_date, '%Y-%m-%d')
+        except ValueError:
+            return make_response(jsonify({"error": "'before_date' must be in 'YYYY-MM-DD' format"}), 400)
+
+        articles = get_related_articles(topic, before_date)
+        return make_response(jsonify({"articles": articles}))
+
+api.add_resource(ArticleTopicResource, "/articles/topic")
+
+llm = ChatOllama(model="mistral:instruct", temperature=0.7, num_predict=256)
+summary_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are generating concise and accurate summaries based on the information found in the text and a provided topic",
+        ),
+        ("human", "Generate a summary of the following input: {question} based on the topic of {topic}\nSummary:"),
+    ]
+)
+
+summary_chain = summary_prompt | llm
+
+embeddings = OllamaEmbeddings(model="mistral:instruct")
+embedding_dimension = 4096
+def get_related_articles(topic: str, before_date: str):
+    query = """
+        WITH $topic_embedding AS topic_vector, datetime($before_date) AS cutoff_date
+        MATCH (article:Article)
+        WHERE article.pubDate < cutoff_date
+        CALL db.index.vector.queryNodes('article_vectors', 5, topic_vector) YIELD node, score
+        RETURN node.link AS link, node.title AS title, node.description AS description,
+            node.pubDate AS pubDate, node.text AS body, score
+        ORDER BY score DESC
+        LIMIT 5;
+    """
+
+    random_query = """
+        MATCH (article:Article)-[:RELATED_TO]->(topic:Topic {name: $topic})
+        WHERE article.pubDate < datetime($before_date)
+        RETURN article.link AS link, article.title AS title, article.description AS description,
+               article.pubDate AS pubDate, article.text AS body
+        ORDER BY rand()
+        LIMIT 5
+    """
+
+    result = neo4j_graph.query(
+        query,
+        {
+            "topic_embedding": embeddings.embed_query(topic)[:1536],
+            "before_date": before_date,
+        },
+    )
+
+    articles = []
+    for record in tqdm(result, desc="Processing articles", unit="article"):
+        summary = summary_chain.invoke({"question": record["body"], "topic": topic}).content
+        articles.append(
+            {
+                "link": record["link"],
+                "title": record["title"],
+                "description": record["description"],
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "score": record["score"],
+                "summary": summary,
+            }
+        )
+
+    result = neo4j_graph.query(
+        random_query,
+        {
+            "topic": topic,
+            "before_date": before_date,
+        },
+    )
+    for record in tqdm(result, desc="Processing articles", unit="article"):
+        summary = summary_chain.invoke({"question": record["body"], "topic": topic}).content
+        articles.append(
+            {
+                "link": record["link"],
+                "title": record["title"],
+                "description": record["description"],
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "score": 0,
+                "summary": summary,
+            }
+        )
+    return articles
+
 
 if __name__ == "__main__":
     app.run(debug=True)
