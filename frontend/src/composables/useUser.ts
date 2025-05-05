@@ -4,7 +4,7 @@ import axios from "axios";
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const user = ref({
-  id: "user123",
+  id: "1",
   name: "John Doe",
   baseUnderstanding: "Intermediate",
   joinDate: new Date("2025-05-04T00:00:00Z"),
@@ -17,16 +17,19 @@ const understandingValue = ref(levels.indexOf(user.value.baseUnderstanding));
 async function fetchUserData() {
   try {
     const response = await axios.get(`${apiUrl}/user?id=${user.value.id}`);
-    if (response.data) {
+    console.log("User data fetched:", response.data);
+    if (response.data.id) {
       user.value = {
         id: response.data.id,
         name: response.data.name,
         baseUnderstanding: response.data.base_understanding,
         joinDate: new Date(response.data.join_date),
-        interests: response.data.interests.map((interest: any) => ({
-          topic: interest.topic,
-          level: interest.level,
-        })),
+        interests: response.data.interests
+          .filter((interest: any) => interest.topic !== null && interest.level !== null)
+          .map((interest: any) => ({
+        topic: interest.topic,
+        level: interest.level,
+          })),
       };
     } else {
       await createUser();

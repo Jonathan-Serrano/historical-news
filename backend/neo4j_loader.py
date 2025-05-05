@@ -19,8 +19,8 @@ neo4j_graph = Neo4jGraph(
     url=url, username=username, password=password, refresh_schema=False
 )
 
-embeddings = OllamaEmbeddings(model="mistral:instruct")
-embedding_dimension = 4096
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
+embedding_dimension = 768
 # llm = ChatOllama(model="mistral:instruct", temperature=0.7, num_predict=256)
 # summary_prompt = ChatPromptTemplate.from_messages(
 #     [
@@ -37,7 +37,7 @@ embedding_dimension = 4096
 def create_constraints(graph: Neo4jGraph):
     constraints = [
         ("user_id_unique", "User", "id"),
-        ("author_name_unique", "Author", "name"),
+        # ("author_name_unique", "Author", "name"),
         ("topic_name_unique", "Topic", "name"),
         ("channel_title_unique", "Channel", "title"),
         ("article_link_unique", "Article", "link"),
@@ -51,30 +51,29 @@ def create_constraints(graph: Neo4jGraph):
         """
         graph.query(cypher)
 
-
 def insert_csv_data(data: pd.DataFrame):
     for index, row in tqdm(
         data.iterrows(), total=len(data), desc="Inserting Data", unit="row"
     ):
         topic_names = row["assigned_topic_name"].split(", ") if row["assigned_topic_name"] else []
 
-        # Merge Channel node
-        query_channel = """
-        MERGE (channel:Channel {title: $channel_title})
-        ON CREATE SET channel.rss_link = $rss_link, channel.description = $channel_description
-        """
-        neo4j_graph.query(
-            query_channel,
-            {
-                "channel_title": row["channel_title"],
-                "rss_link": row["source"],
-                "channel_description": row["channel_description"],
-            },
-        )
+        # # Merge Channel node
+        # query_channel = """
+        # MERGE (channel:Channel {title: $channel_title})
+        # ON CREATE SET channel.rss_link = $rss_link, channel.description = $channel_description
+        # """
+        # neo4j_graph.query(
+        #     query_channel,
+        #     {
+        #         "channel_title": row["channel_title"],
+        #         "rss_link": row["source"],
+        #         "channel_description": row["channel_description"],
+        #     },
+        # )
 
         # Using f-strings for cleaner string concatenation
         article_text = (
-            f"{row.get('title', '')} {row.get('description', '')}".strip()
+            f"{row.get('title', '')} {row.get('body', '')}".strip()
         )
 
         # summary = summary_chain.invoke({"question": article_text}).content
@@ -82,12 +81,11 @@ def insert_csv_data(data: pd.DataFrame):
 
         article_embedding = embeddings.embed_query(article_text)
         params = {
-            "article_link": row["link"],
+            "article_link": row["url"],
             "article_title": row["title"],
-            "article_description": row["description"],
-            "pub_date": row["pubDate"],
-            "article_text": article_text,
-            "article_embedding": article_embedding, 
+            "article_description": row["body"],
+            "pub_date": row["timestamp"],
+            "article_embedding": article_embedding,
         }
 
         # Updated query to save article with its embedding
@@ -97,8 +95,6 @@ def insert_csv_data(data: pd.DataFrame):
                 article.title = $article_title, 
                 article.description = $article_description,
                 article.pubDate = datetime($pub_date)
-            SET 
-                article.text = $article_text
 
             WITH article, $article_embedding AS embedding
             CALL db.create.setNodeVectorProperty(article, 'embedding', embedding)
@@ -110,33 +106,57 @@ def insert_csv_data(data: pd.DataFrame):
         try:
             neo4j_graph.query(
                 """
-                CREATE VECTOR INDEX IF NOT EXISTS article_vectors
+                CREATE VECTOR INDEX article_vectors IF NOT EXISTS
                 FOR (n:Article)
                 ON (n.embedding)
-                OPTIONS {indexConfig: {
-                    'vector.dimensions': $dimension,
-                    'vector.similarity_function': 'cosine'
-                }}
+                OPTIONS {
+                indexConfig: {
+                    `vector.dimensions`: $dimension,
+                    `vector.similarity_function`: 'cosine'
+                  }
+                }
                 """,
                 {"dimension": embedding_dimension},
             )
-        except ClientError:
-            pass
-        
-        # Merge Author node
-        query_author = """
-        MERGE (author:Author {name: $author_name})
-        """
-        neo4j_graph.query(query_author, {"author_name": row["author"]})
+        except ClientError as e:
+            if "Index already exists" not in str(e):
+                print(f"Error creating index: {e}")
 
-        # Article is written by Author
-        query_written_by = """
-        MATCH (article:Article {link: $article_link}), (author:Author {name: $author_name})
-        MERGE (article)-[:WRITTEN_BY]->(author)
+        # # Merge Author node
+        # query_author = """
+        # MERGE (author:Author {name: $author_name})
+        # """
+        # neo4j_graph.query(query_author, {"author_name": row["author"]})
+
+        # # Article is written by Author
+        # query_written_by = """
+        # MATCH (article:Article {link: $article_link}), (author:Author {name: $author_name})
+        # MERGE (article)-[:WRITTEN_BY]->(author)
+        # """
+        # neo4j_graph.query(
+        #     query_written_by,
+        #     {"article_link": row["link"], "author_name": row["author"]},
+        # )
+
+        query_channel = """
+        MERGE (channel:Channel {title: $channel_title})
+        """
+
+        neo4j_graph.query(
+            query_channel,
+            {
+                "channel_title": row["source"],
+            },
+        )
+
+        # Article comes from Channel
+        query_comes_from = """
+        MATCH (article:Article {link: $article_link}), (channel:Channel {title: $channel_title})
+        MERGE (article)-[:COMES_FROM]->(channel)
         """
         neo4j_graph.query(
-            query_written_by,
-            {"article_link": row["link"], "author_name": row["author"]},
+            query_comes_from,
+            {"article_link": row["url"], "channel_title": row["source"]},
         )
 
         for topic_name in topic_names:
@@ -152,7 +172,7 @@ def insert_csv_data(data: pd.DataFrame):
             """
             neo4j_graph.query(
                 query_related_to,
-                {"article_link": row["link"], "topic_name": topic_name},
+                {"article_link": row["url"], "topic_name": topic_name},
             )
 
 
@@ -182,10 +202,9 @@ def insert_topic_data(topic_df: pd.DataFrame):
             },
         )
 
-
 csv_data = pd.read_csv("data.csv")
 csv_data = csv_data.fillna("")
-csv_data["pubDate"] = pd.to_datetime(csv_data["pubDate"], errors="coerce", utc=True)
+csv_data["timestamp"] = pd.to_datetime(csv_data["timestamp"], errors="coerce", utc=True)
 print("CSV data shape:", csv_data.shape)
 create_constraints(neo4j_graph)
 insert_csv_data(csv_data)

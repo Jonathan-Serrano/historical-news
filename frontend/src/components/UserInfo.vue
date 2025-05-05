@@ -25,6 +25,7 @@
           placeholder="Add interest"
           class="w-full"
           forceSelection
+          dropdown 
         />
         <Dropdown v-model="newLevel" :options="levels" placeholder="Select level" class="w-full" />
         <Button label="Add" @click="addInterest" class="w-full" />

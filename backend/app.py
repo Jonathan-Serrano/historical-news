@@ -111,7 +111,8 @@ class UserResource(Resource):
         user_id = request.args.get("id")
         # Query to retrieve user information and their subscribed interests with levels
         query = """
-        MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)
+        MATCH (user:User {id: $user_id})
+        OPTIONAL MATCH (user)-[:SUBSCRIBED_TO]->(topic:Topic)
         OPTIONAL MATCH (user)-[r:LEVEL_OF_UNDERSTANDING]->(topic)
         RETURN
             user.id AS id, 
@@ -129,7 +130,7 @@ class UserResource(Resource):
 
             return make_response(jsonify(user), 200)
         else:
-            return make_response(jsonify({"message": "User not found!"}), 404)
+            return make_response(jsonify({"message": "User not found!"}), 201)
 
 
 class UserInterestResource(Resource):
@@ -237,29 +238,27 @@ class ArticleTopicResource(Resource):
 
 api.add_resource(ArticleTopicResource, "/articles/topic")
 
-llm = ChatOllama(model="mistral:instruct", temperature=0.7, num_predict=256)
+llm = ChatOllama(model="llama3.2", temperature=0.7, num_predict=256)
 summary_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             "You are generating concise and accurate summaries based on the information found in the text and a provided topic",
         ),
-        ("human", "Generate a summary of the following input: {question} based on the topic of {topic}\nSummary:"),
+        ("human", "Generate a summary of the following input: {question} based on the topic of {topic}. Return just the summary.\nSummary:"),
     ]
 )
 
 summary_chain = summary_prompt | llm
 
-embeddings = OllamaEmbeddings(model="mistral:instruct")
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
 embedding_dimension = 4096
 def get_related_articles(topic: str, before_date: str):
     query = """
-        WITH $topic_embedding AS topic_vector, datetime($before_date) AS cutoff_date
-        MATCH (article:Article)
-        WHERE article.pubDate < cutoff_date
+        WITH $topic_embedding AS topic_vector
         CALL db.index.vector.queryNodes('article_vectors', 5, topic_vector) YIELD node, score
         RETURN node.link AS link, node.title AS title, node.description AS description,
-            node.pubDate AS pubDate, node.text AS body, score
+            node.pubDate AS pubDate, score
         ORDER BY score DESC
         LIMIT 5;
     """
@@ -268,7 +267,7 @@ def get_related_articles(topic: str, before_date: str):
         MATCH (article:Article)-[:RELATED_TO]->(topic:Topic {name: $topic})
         WHERE article.pubDate < datetime($before_date)
         RETURN article.link AS link, article.title AS title, article.description AS description,
-               article.pubDate AS pubDate, article.text AS body
+               article.pubDate AS pubDate, 0 AS score
         ORDER BY rand()
         LIMIT 5
     """
@@ -276,14 +275,14 @@ def get_related_articles(topic: str, before_date: str):
     result = neo4j_graph.query(
         query,
         {
-            "topic_embedding": embeddings.embed_query(topic)[:1536],
+            "topic_embedding": embeddings.embed_query(topic),
             "before_date": before_date,
         },
     )
 
     articles = []
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke({"question": record["body"], "topic": topic}).content
+        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content
         articles.append(
             {
                 "link": record["link"],
@@ -303,14 +302,16 @@ def get_related_articles(topic: str, before_date: str):
         },
     )
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke({"question": record["body"], "topic": topic}).content
+        summary = summary_chain.invoke(
+            {"question": record["title"] + record["description"], "topic": topic}
+        ).content
         articles.append(
             {
                 "link": record["link"],
                 "title": record["title"],
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "score": 0,
+                "score": record["score"],
                 "summary": summary,
             }
         )

@@ -56,3 +56,8 @@ backend/data_extraction/memento_data/topic_results_renamed.csv
 backend/data_extraction/memento_data/bertopic_topics.csv
 backend/data_extraction/memento_data/bertopic_topics.csv
 backend/data_extraction/memento_data/bertopic_topics.csv
+backend/data_extraction/memento_data/bertopic_topics.csv
+backend/data_extraction/memento_data/newsCorpora_with_topic.csv
+backend/data_extraction/memento_data/oldbertopic_topics.csv
+backend/old_data.csv
+backend/old_topic_data.csv
