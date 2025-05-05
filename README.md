@@ -43,7 +43,7 @@ docker compose up -d
 If you are using Comila, you need to do these steps 
 ```bash
 colima start 
-install docker-compose
+brew install docker-compose
 docker-compose up -d   
 ```
 
