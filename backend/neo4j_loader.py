@@ -4,9 +4,7 @@ from dotenv import load_dotenv
 from neo4j.exceptions import ClientError
 from tqdm import tqdm
 from langchain_neo4j import Neo4jGraph
-from langchain_text_splitters import TokenTextSplitter
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain.prompts import ChatPromptTemplate
+import ast
 
 load_dotenv()
 
@@ -18,26 +16,11 @@ password = os.getenv("NEO4J_PASSWORD")
 neo4j_graph = Neo4jGraph(
     url=url, username=username, password=password, refresh_schema=False
 )
-
-embeddings = OllamaEmbeddings(model="nomic-embed-text")
 embedding_dimension = 768
-# llm = ChatOllama(model="mistral:instruct", temperature=0.7, num_predict=256)
-# summary_prompt = ChatPromptTemplate.from_messages(
-#     [
-#         (
-#             "system",
-#             "You are generating concise and accurate summaries based on the information found in the text.",
-#         ),
-#         ("human", "Generate a summary of the following input: {question}\nSummary:"),
-#     ]
-# )
-
-# summary_chain = summary_prompt | llm
 
 def create_constraints(graph: Neo4jGraph):
     constraints = [
         ("user_id_unique", "User", "id"),
-        # ("author_name_unique", "Author", "name"),
         ("topic_name_unique", "Topic", "name"),
         ("channel_title_unique", "Channel", "title"),
         ("article_link_unique", "Article", "link"),
@@ -56,36 +39,12 @@ def insert_csv_data(data: pd.DataFrame):
         data.iterrows(), total=len(data), desc="Inserting Data", unit="row"
     ):
         topic_names = row["assigned_topic_name"].split(", ") if row["assigned_topic_name"] else []
-
-        # # Merge Channel node
-        # query_channel = """
-        # MERGE (channel:Channel {title: $channel_title})
-        # ON CREATE SET channel.rss_link = $rss_link, channel.description = $channel_description
-        # """
-        # neo4j_graph.query(
-        #     query_channel,
-        #     {
-        #         "channel_title": row["channel_title"],
-        #         "rss_link": row["source"],
-        #         "channel_description": row["channel_description"],
-        #     },
-        # )
-
-        # Using f-strings for cleaner string concatenation
-        article_text = (
-            f"{row.get('title', '')} {row.get('body', '')}".strip()
-        )
-
-        # summary = summary_chain.invoke({"question": article_text}).content
-        # summary_embedding = embeddings.embed_query(summary)
-
-        article_embedding = embeddings.embed_query(article_text)
         params = {
             "article_link": row["url"],
             "article_title": row["title"],
             "article_description": row["body"],
             "pub_date": row["timestamp"],
-            "article_embedding": article_embedding,
+            "article_embedding": row["embedding"],
         }
 
         # Updated query to save article with its embedding
@@ -121,22 +80,6 @@ def insert_csv_data(data: pd.DataFrame):
         except ClientError as e:
             if "Index already exists" not in str(e):
                 print(f"Error creating index: {e}")
-
-        # # Merge Author node
-        # query_author = """
-        # MERGE (author:Author {name: $author_name})
-        # """
-        # neo4j_graph.query(query_author, {"author_name": row["author"]})
-
-        # # Article is written by Author
-        # query_written_by = """
-        # MATCH (article:Article {link: $article_link}), (author:Author {name: $author_name})
-        # MERGE (article)-[:WRITTEN_BY]->(author)
-        # """
-        # neo4j_graph.query(
-        #     query_written_by,
-        #     {"article_link": row["link"], "author_name": row["author"]},
-        # )
 
         query_channel = """
         MERGE (channel:Channel {title: $channel_title})
@@ -201,10 +144,13 @@ def insert_topic_data(topic_df: pd.DataFrame):
                 ),
             },
         )
-
+        
 csv_data = pd.read_csv("data.csv")
 csv_data = csv_data.fillna("")
 csv_data["timestamp"] = pd.to_datetime(csv_data["timestamp"], errors="coerce", utc=True)
+csv_data["embedding"] = csv_data["embedding"].apply(
+    lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+)
 print("CSV data shape:", csv_data.shape)
 create_constraints(neo4j_graph)
 insert_csv_data(csv_data)
