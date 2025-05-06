@@ -51,6 +51,13 @@ docker-compose up -d
 # Remember to download OLLAMA at https://ollama.com/download 
 ollama run llama3
 ```
+
+next run these 
+```bash
+ollama pull nomic-embed-text
+python neo4j_loader.py
+```
+
 ### 3. Setup Frontend 
 ```bash
 cd frontend
@@ -68,7 +75,8 @@ NEO4J_PASSWORD=your_password
 
 LLM_MODEL=llama3
 PORT=5000
-``` 
+```
+
 
 - Create a `.env` file in the `frontend` directory.
 - Add the following variable:
