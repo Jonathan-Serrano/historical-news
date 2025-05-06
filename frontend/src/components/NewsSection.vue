@@ -6,9 +6,15 @@
       <h3 class="text-lg font-semibold mb-2">While you were away ...</h3>
       <Message severity="info" class="mb-2">{{ user.name }} understands {{ currentInterest.topic }} at level {{ currentInterest.level }}</Message>
       <p class="mb-4">{{ summary }}</p>
+      <template v-if="isLoading">
+        <div class="flex justify-center items-center">
+          <i class="pi pi-spin pi-spinner text-2xl"></i>
+        </div>
+      </template>
       <Accordion :activeIndex="0">
         <AccordionTab v-for="(newsItem, index) in news" :key="index" :header="newsItem.title">
-          <p>{{ newsItem.summary }}</p>
+            <p v-if="!isLoading">{{ newsItem.summary }}</p>
+            <i v-else class="pi pi-spin pi-spinner"></i>
           <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.url)" class="mt-2" />
         </AccordionTab>
       </Accordion>
@@ -55,6 +61,7 @@ const { currentInterest, setCurrentInterest, fetchTopicSummary, fetchRelatedArti
 const { currentDate } = useCurrentDate();
 const summary = ref('');
 const news = ref<{ title: string; summary: string; url: string }[]>([]);
+const isLoading = ref(false);
 
 const menuItems = computed(() => {
   return user.value.interests.map((interest) => ({
@@ -64,6 +71,7 @@ const menuItems = computed(() => {
       setCurrentInterest(interest.topic, interest.level);
       
       if (currentDate.value) {
+          isLoading.value = true;
           fetchRelatedArticles(currentDate.value).then((result) => {
           news.value = result;
           console.log('Fetched news:', result);
@@ -71,6 +79,7 @@ const menuItems = computed(() => {
           console.log('Summaries:', summaries);
           const combined_summaries = summaries.join("\n\n");
           fetchTopicSummary(combined_summaries).then((api_summary) => {
+            isLoading.value = false;
             summary.value = api_summary;
           });
         });
