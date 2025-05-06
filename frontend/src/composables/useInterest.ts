@@ -48,6 +48,7 @@ async function fetchRelatedArticles(currentDate: Date) {
     const response = await axios.get(`${apiUrl}/articles/topic`, {
       params: {
         topic: currentInterest.value.topic,
+        level: currentInterest.value.level,
         before_date: currentDate.toISOString().split("T")[0],
       },
     });

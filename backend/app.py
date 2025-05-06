@@ -240,18 +240,18 @@ api.add_resource(SummarizeAllArticlesResource, "/summarize_all_articles")
 class ArticleTopicResource(Resource):
     def get(self):
         topic = request.args.get('topic')
+        level = request.args.get('level')
         before_date = request.args.get('before_date')
 
-        if not topic or not before_date:
-            return make_response(jsonify({"error": "Missing 'topic' or 'before_date' parameter"}), 400)
-
+        if not topic or not before_date or not level:
+            return make_response(jsonify({"error": "Missing 'topic' or 'before_date' or 'level' parameter"}), 400)
         try:
             # Ensure before_date is a valid ISO format date string
             datetime.strptime(before_date, '%Y-%m-%d')
         except ValueError:
             return make_response(jsonify({"error": "'before_date' must be in 'YYYY-MM-DD' format"}), 400)
 
-        articles = get_related_articles(topic, before_date)
+        articles = get_related_articles(topic, before_date, level)
         return make_response(jsonify({"articles": articles}))
 
 api.add_resource(ArticleTopicResource, "/articles/topic")
@@ -263,7 +263,7 @@ summary_prompt = ChatPromptTemplate.from_messages(
             "system",
             "You are generating concise and accurate summaries based on the information found in the text and a provided topic",
         ),
-        ("human", "Generate a summary of the following input: {question} based on the topic of {topic}. Return just the summary.\nSummary:"),
+        ("human", "Generate a summary of the following input: {question} based on the topic of {topic} and explain it at a {level} level. Return just the summary.\nSummary:"),
     ]
 )
 summary_chain = summary_prompt | llm
@@ -284,7 +284,7 @@ meta_summary_chain = meta_summary_prompt | llm
 
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
 embedding_dimension = 4096
-def get_related_articles(topic: str, before_date: str):
+def get_related_articles(topic: str, before_date: str, level: str):
     query = """
         WITH $topic_embedding AS topic_vector
         CALL db.index.vector.queryNodes('article_vectors', 5, topic_vector) YIELD node, score
@@ -313,7 +313,7 @@ def get_related_articles(topic: str, before_date: str):
 
     articles = []
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content
+        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level}).content
         articles.append(
             {
                 "link": record["link"],
@@ -334,7 +334,7 @@ def get_related_articles(topic: str, before_date: str):
     )
     for record in tqdm(result, desc="Processing articles", unit="article"):
         summary = summary_chain.invoke(
-            {"question": record["title"] + record["description"], "topic": topic}
+            {"question": record["title"] + record["description"], "topic": topic, "level": level}
         ).content
         articles.append(
             {
