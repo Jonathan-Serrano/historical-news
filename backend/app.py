@@ -359,12 +359,17 @@ class HistoryResource(Resource):
         query = """
         MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)<-[:RELATED_TO]-(article:Article)
         WHERE topic.name = $topic
-        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link,
+        AND article.pubDate < datetime($date)
+        RETURN article.embedding AS embedding, elementId(article) as elementId, article.link AS link,
                article.title AS title, article.description AS description, article.pubDate AS pubDate
         ORDER BY article.pubDate DESC
         """
-        result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
+        result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic, "date": date})
         embeddings = np.array([article["embedding"] for article in result])
+        
+        # print length of result
+        print(f"Number of articles retrieved: {len(result)}")
+        print (f"Embeddings shape: {embeddings.shape}")
 
         select_indices = select_dissimilar_embeddings(embeddings, 25) # k = 25 = history size limit
         selected_articles = [result[i] for i in select_indices]
@@ -373,7 +378,8 @@ class HistoryResource(Resource):
         query = """
         UNWIND $articles AS article
         MATCH (user:User {id: $user_id})
-        MATCH (a:Article {elementId: article.elementId})-[:RELATED_TO]->(topic:Topic {name: $topic})
+        MATCH (a:Article)-[:RELATED_TO]->(topic:Topic {name: $topic})
+        WHERE elementId(a) = article.elementId
         MERGE (user)-[r:LAST_QUERY]->(a)
         SET r.lastQueriedAt = $date
         MERGE (user)-[r2:LAST_QUERY]->(topic)
@@ -391,9 +397,7 @@ class HistoryResource(Resource):
                 "link": record["link"],
                 "title": record["title"],
                 "description": record["description"],
-                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "score": record["score"],
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S")
             }
             for record in selected_articles
         ]
@@ -404,6 +408,7 @@ class HistoryResource(Resource):
         # Retrieve all articles related to topic that was last queried by the user
         query = """
         MATCH (user:User {id: $user_id})-[:LAST_QUERY]->(topic:Topic {name: $topic})<-[:RELATED_TO]-(article:Article)
+        MATCH (user)-[:LAST_QUERY]->(article)
         RETURN article.link AS link, article.title AS title, article.description AS description, article.pubDate AS pubDate
         """
 
@@ -414,8 +419,6 @@ class HistoryResource(Resource):
                 "title": record["title"],
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "score": record["score"],
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
             }
             for record in history
         ]
@@ -435,24 +438,37 @@ class HistoryResource(Resource):
         if result and len(result) > 0:
             prev_date = result[0]["lastQueriedAt"]
         else:
-            return make_response(jsonify({"error": "No previous date found"}), 400)
-    
+            return make_response(jsonify({"error": "No previous date found"}), 404)
+        
         # get all relevant articles that were published after the last query date
         query = """
         MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)<-[:RELATED_TO]-(article:Article)
         WHERE topic.name = $topic
-        WHERE article.pubDate > datetime($prev_date)
-        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link,
+        AND article.pubDate > datetime($prev_date)
+        RETURN article.embedding AS embedding, elementId(article) as elementId, article.link AS link,
                article.title AS title, article.description AS description, article.pubDate AS pubDate
         ORDER BY article.pubDate DESC
         """
         new_result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic, "prev_date": prev_date})
         new_embeddings = np.array([article["embedding"] for article in new_result])
 
+        # if there are no new articles
+        if(len(new_embeddings) == 0):
+            articles = [
+                {
+                    "link": record["link"],
+                    "title": record["title"],
+                    "description": record["description"],
+                    "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                } for record in new_history
+            ]
+            return make_response(jsonify(articles), 202)
+
+
         # get the articles from the history that are related to the topic
         query = """
         MATCH (user:User {id: $user_id})-[:LAST_QUERY]->(topic:Topic {name: $topic})<-[:RELATED_TO]-(article:Article)
-        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link, article.title AS title, article.description AS description, article.pubDate AS pubDate
+        RETURN article.embedding AS embedding, elementId(article) as elementId, article.link AS link, article.title AS title, article.description AS description, article.pubDate AS pubDate
         """
         history = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
         history_embeddings = np.array([article["embedding"] for article in history])
@@ -467,7 +483,8 @@ class HistoryResource(Resource):
         query = """
         UNWIND $articles AS article
         MATCH (user:User {id: $user_id})
-        MATCH (a:Article {elementId: article.elementId})-[:RELATED_TO]->(topic:Topic {name: $topic})
+        MATCH (a:Article)-[:RELATED_TO]->(topic:Topic {name: $topic})
+        WHERE elementId(a) = article.elementId
         MERGE (user)-[r:LAST_QUERY]->(a)
         SET r.lastQueriedAt = $date
         MERGE (user)-[r2:LAST_QUERY]->(topic)
@@ -486,8 +503,6 @@ class HistoryResource(Resource):
                 "title": record["title"],
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "score": record["score"],
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
             }
             for record in new_history
         ]
