@@ -213,12 +213,30 @@ class InterestResource(Resource):
         result = neo4j_graph.query(query)
         topics = [record["name"] for record in result]
         return make_response(jsonify(topics), 200)
+    
+
+class SummarizeAllArticlesResource(Resource):
+    def get(self):
+        summaries = request.args.get("combined_summaries")  
+        topic = request.args.get("topic")
+        if not summaries:
+            return make_response(jsonify({"error": "No summaries provided"}), 400)
+        if not topic:
+            return make_response(jsonify({"error": "No topic provided"}), 400)
+        # Generate meta-summary
+        summary_ret = meta_summary_chain.invoke({"summaries": summaries, "topic": topic}).content
+        
+        return summary_ret
+
 
 api.add_resource(UserResource, "/user")
 api.add_resource(UserInterestResource, "/user/<string:user_id>/interest")
 api.add_resource(UserArticleResource, "/user/<string:user_id>/article")
 api.add_resource(InterestResource, "/interests")
+api.add_resource(SummarizeAllArticlesResource, "/summarize_all_articles")
 
+
+# gives 10 articles related to the topic
 class ArticleTopicResource(Resource):
     def get(self):
         topic = request.args.get('topic')
@@ -248,8 +266,21 @@ summary_prompt = ChatPromptTemplate.from_messages(
         ("human", "Generate a summary of the following input: {question} based on the topic of {topic}. Return just the summary.\nSummary:"),
     ]
 )
-
 summary_chain = summary_prompt | llm
+
+meta_summary_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are generating a meta-summary from multiple summaries about a given topic.",
+        ),
+        (
+            "human",
+            "Generate an overall summary of the following summaries: {summaries} based on the topic of {topic}. Do not include any extra text or headings—just return the summary.:",
+        ),
+    ]
+)
+meta_summary_chain = meta_summary_prompt | llm
 
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
 embedding_dimension = 4096

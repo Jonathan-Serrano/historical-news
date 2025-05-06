@@ -13,17 +13,29 @@ function setCurrentInterest(topic: string, level: string) {
 }
 
 
-async function fetchTopicSummary() {
-    try {
+async function fetchTopicSummary(combined_summaries: String) {
+    
+        if (!combined_summaries) {
+            console.warn("Combined summaries is empty. Skipping fetch.");
+            return "";
+        }
+        try {
+            const response = await axios.get(`${apiUrl}/summarize_all_articles`, {
+                params: {
+                    topic: currentInterest.value.topic,
+                    combined_summaries: combined_summaries,
+                },
+            });
+            console.log("Topic summary response:", response.data);
+            return response.data;
+        }
+        catch (error) {
+          console.error("Error fetching topic summary:", error);
+          return "Error fetching topic summary";
+      }
         // const response = await axios.get(`${apiUrl}/topic-summary?topic=${currentInterest.value.topic}`);
         
-        const data = "Graph Neural Nework is a type of neural network that operates on graph data structures. It is designed to learn from the relationships and connections between nodes in a graph, making it suitable for tasks such as node classification, link prediction, and graph classification. GNNs have applications in various fields, including social network analysis, recommendation systems, and molecular chemistry.";
-        return data;
-    }
-    catch (error) {
-        console.error("Error fetching topic summary:", error);
-        return "Error fetching topic summary";
-    }
+        //const data = "Graph Neural Nework is a type of neural network that operates on graph data structures. It is designed to learn from the relationships and connections between nodes in a graph, making it suitable for tasks such as node classification, link prediction, and graph classification. GNNs have applications in various fields, including social network analysis, recommendation systems, and molecular chemistry.";
 }
 
 async function fetchRelatedArticles(currentDate: Date) {
@@ -53,7 +65,7 @@ export function useInterest() {
     return {
       currentInterest,
       setCurrentInterest,
-      fetchTopicSummary,
       fetchRelatedArticles,
+      fetchTopicSummary,
     };
 }

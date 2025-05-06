@@ -62,14 +62,20 @@ const menuItems = computed(() => {
     icon: 'pi pi-fw pi-tag',
     command: () => {
       setCurrentInterest(interest.topic, interest.level);
-      fetchTopicSummary().then((result) => {
-        summary.value = result;
-      });
+      
       if (currentDate.value) {
-        fetchRelatedArticles(currentDate.value).then((result) => {
+          fetchRelatedArticles(currentDate.value).then((result) => {
           news.value = result;
+          console.log('Fetched news:', result);
+          const summaries = news.value.map((article) => article.summary);
+          console.log('Summaries:', summaries);
+          const combined_summaries = summaries.join("\n\n");
+          fetchTopicSummary(combined_summaries).then((api_summary) => {
+            summary.value = api_summary;
+          });
         });
       }
+     
     },
   }));
 });
