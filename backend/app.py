@@ -9,6 +9,8 @@ import os
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from tqdm import tqdm
+from sklearn.metrics.pairwise import cosine_distances
+import numpy as np
 
 load_dotenv()
 
@@ -348,6 +350,181 @@ def get_related_articles(topic: str, before_date: str, level: str):
         )
     return articles
 
+class HistoryResource(Resource):
+    def post(self, user_id, topic):
+        data = request.json
+        date = data.get("current_date")
+        
+        # Retrieve all article embeddings from given topic the tiven user is subscribed to
+        query = """
+        MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)<-[:RELATED_TO]-(article:Article)
+        WHERE topic.name = $topic
+        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link,
+               article.title AS title, article.description AS description, article.pubDate AS pubDate
+        ORDER BY article.pubDate DESC
+        """
+        result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
+        embeddings = np.array([article["embedding"] for article in result])
+
+        select_indices = select_dissimilar_embeddings(embeddings, 25) # k = 25 = history size limit
+        selected_articles = [result[i] for i in select_indices]
+
+        # Add LAST_QUERY relationship for each selected article's topic
+        query = """
+        UNWIND $articles AS article
+        MATCH (user:User {id: $user_id})
+        MATCH (a:Article {elementId: article.elementId})-[:RELATED_TO]->(topic:Topic {name: $topic})
+        MERGE (user)-[r:LAST_QUERY]->(a)
+        SET r.lastQueriedAt = $date
+        MERGE (user)-[r2:LAST_QUERY]->(topic)
+        SET r2.lastQueriedAt = $date
+        """
+        neo4j_graph.query(query, {
+            "user_id": user_id,
+            "articles": selected_articles,  # Each dict should have "elementId" key
+            "topic": topic,
+            "date": date
+        })
+
+        articles = [
+            {
+                "link": record["link"],
+                "title": record["title"],
+                "description": record["description"],
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "score": record["score"],
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
+            }
+            for record in selected_articles
+        ]
+
+        return make_response(jsonify(articles), 201)
+
+    def get(self, user_id, topic):
+        # Retrieve all articles related to topic that was last queried by the user
+        query = """
+        MATCH (user:User {id: $user_id})-[:LAST_QUERY]->(topic:Topic {name: $topic})<-[:RELATED_TO]-(article:Article)
+        RETURN article.link AS link, article.title AS title, article.description AS description, article.pubDate AS pubDate
+        """
+
+        history = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
+        articles = [
+            {
+                "link": record["link"],
+                "title": record["title"],
+                "description": record["description"],
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "score": record["score"],
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
+            }
+            for record in history
+        ]
+
+        return make_response(jsonify(articles), 201)
+    
+    def put(self, user_id, topic):
+        data = request.json
+        date = data.get("current_date")
+
+        # get the date of the last query for the given topic
+        query = """
+        MATCH (user:User {id: $user_id})-[r:LAST_QUERY]->(topic:Topic {name: $topic})
+        RETURN r.lastQueriedAt AS lastQueriedAt
+        """
+        result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
+        if result and len(result) > 0:
+            prev_date = result[0]["lastQueriedAt"]
+        else:
+            return make_response(jsonify({"error": "No previous date found"}), 400)
+    
+        # get all relevant articles that were published after the last query date
+        query = """
+        MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)<-[:RELATED_TO]-(article:Article)
+        WHERE topic.name = $topic
+        WHERE article.pubDate > datetime($prev_date)
+        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link,
+               article.title AS title, article.description AS description, article.pubDate AS pubDate
+        ORDER BY article.pubDate DESC
+        """
+        new_result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic, "prev_date": prev_date})
+        new_embeddings = np.array([article["embedding"] for article in new_result])
+
+        # get the articles from the history that are related to the topic
+        query = """
+        MATCH (user:User {id: $user_id})-[:LAST_QUERY]->(topic:Topic {name: $topic})<-[:RELATED_TO]-(article:Article)
+        RETURN article.embedding AS embedding, article.elementId as elementId, article.link AS link, article.title AS title, article.description AS description, article.pubDate AS pubDate
+        """
+        history = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
+        history_embeddings = np.array([article["embedding"] for article in history])
+
+        all_articles = history + new_result
+        all_embeddings = np.concatenate((history_embeddings, new_embeddings), axis=0)
+
+        dissimilar_indices = select_dissimilar_embeddings(all_embeddings, 25) # k = 25 = history size limit
+        new_history = [all_articles[i] for i in dissimilar_indices]
+
+        # Add LAST_QUERY relationship for each selected article's topic
+        query = """
+        UNWIND $articles AS article
+        MATCH (user:User {id: $user_id})
+        MATCH (a:Article {elementId: article.elementId})-[:RELATED_TO]->(topic:Topic {name: $topic})
+        MERGE (user)-[r:LAST_QUERY]->(a)
+        SET r.lastQueriedAt = $date
+        MERGE (user)-[r2:LAST_QUERY]->(topic)
+        SET r2.lastQueriedAt = $date
+        """
+        neo4j_graph.query(query, {
+            "user_id": user_id,
+            "articles": new_history,  # Each dict should have "elementId" key
+            "topic": topic,
+            "date": date
+        })
+
+        articles = [
+            {
+                "link": record["link"],
+                "title": record["title"],
+                "description": record["description"],
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "score": record["score"],
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic}).content,
+            }
+            for record in new_history
+        ]
+
+        return make_response(jsonify(articles), 201)
+
+
+api.add_resource(HistoryResource, "/articles/history")
+
+def select_dissimilar_embeddings(embeddings: np.ndarray, k):
+    # embeddings: numpy array of shape [N, D]
+    N = embeddings.shape[0]
+    if k >= N:
+        return list(range(N))  # return all if k >= total nodes
+
+    # Compute cosine distances
+    distances = cosine_distances(embeddings)
+
+    # Start with the point that is farthest from all others (max average distance)
+    first_idx = np.argmax(distances.mean(axis=1))
+    selected = [first_idx]
+    remaining = set(range(N)) - {first_idx}
+
+    for _ in range(k - 1):
+        # For each candidate, find its distance to the closest selected point
+        min_distances = [
+            (idx, min(distances[idx][s] for s in selected)) for idx in remaining
+        ]
+        # Pick the one with the largest min distance (most dissimilar from any selected)
+        next_idx = max(min_distances, key=lambda x: x[1])[0]
+        selected.append(next_idx)
+        remaining.remove(next_idx)
+
+    return selected  # indices of selected embeddings
+
+
+        
 
 if __name__ == "__main__":
     app.run(debug=True)
