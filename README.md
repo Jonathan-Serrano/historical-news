@@ -23,7 +23,7 @@ A full-stack web application built with:
 ## Getting Started
 
 ### 1. Clone the Repository
-### 2. Setup Backend
+### 2. Set up Backend
 
 ```bash
 cd backend
@@ -36,47 +36,45 @@ python app.py
 ```
 
 ```bash
+# Remember to download OLLAMA at https://ollama.com/download
+ollama serve
+ollama pull llama3.2
+ollama pull nomic-embed-text
+```
+
+```
+python neo4j_loader.py
+```
+
+```bash
 cd backend
 docker compose up -d
 ```
 
-If you are using Comila, you need to do these steps 
+If you are using Colima, do these steps prior:
 ```bash
-colima start 
 brew install docker-compose
-docker-compose up -d   
+colima start
 ```
 
-```bash
-# Remember to download OLLAMA at https://ollama.com/download 
-ollama run llama3
-```
-
-next run these 
-```bash
-ollama pull nomic-embed-text
-python neo4j_loader.py
-```
-
-### 3. Setup Frontend 
+### 3. Set up Frontend 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-### 4. Setup environment variables
+### 4. Set up environment variables
 - Create a `.env` file in the `backend` directory.
 - Add the following variables:
 
-```env
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
+    ```env
+    NEO4J_URI=bolt://localhost:7687
+    NEO4J_USER=neo4j
+    NEO4J_PASSWORD=your_password
 
-LLM_MODEL=llama3
-PORT=5000
-```
-
+    LLM_MODEL=llama3.2
+    PORT=5000
+    ```
 
 - Create a `.env` file in the `frontend` directory.
 - Add the following variable:
@@ -85,8 +83,8 @@ PORT=5000
 FLASK_API_URL=http://127.0.0.1:5000/
 ``` 
 
-Make sure to end docker compose and comila when closing the project:
+### Closing the project:
 ```bash
-docker-compose down
-colima stop
+docker compose down
+colima stop # If using Colima
 ```
