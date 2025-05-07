@@ -5,6 +5,9 @@ Provide the user with a personalized topic-specific news feed.
 For **new users**, a brief history of the topic will be generated to offer appropriate context.  
 For **returning users**, a summarization of new articles is provided, ensuring that only novel information is highlighted.
 
+## YouTube Link
+https://youtu.be/LII_kS8-diM
+
 ## Features
 
 ### Topic Modelling
