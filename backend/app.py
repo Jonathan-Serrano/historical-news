@@ -292,7 +292,6 @@ class SummarizeAllArticlesResource(Resource):
         summary_ret = meta_summary_chain.invoke({"summaries": summaries, "topic": topic, "role": role}).content
         
         return summary_ret
-        
 
 
 api.add_resource(UserResource, "/user")
