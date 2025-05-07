@@ -13,6 +13,8 @@
       </template>
       <Accordion :activeIndex="0">
         <AccordionTab v-for="(newsItem, index) in news" :key="index" :header="newsItem.title">
+            <p>The intent of this article is to: {{ newsItem.intent }}</p>
+            <br> 
             <p v-if="!isLoading">{{ newsItem.summary }}</p>
             <i v-else class="pi pi-spin pi-spinner"></i>
           <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.link)" class="mt-2" />
@@ -78,7 +80,7 @@ const { user } = useUser();
 const { currentInterest, setCurrentInterest, fetchTopicSummary, fetchRelatedArticles, checkAndHandleHistory } = useInterest();
 const { currentDate } = useCurrentDate();
 const summary = ref('');
-const news = ref<{ title: string; summary: string; url: string }[]>([]);
+const news = ref<{ title: string; summary: string; url: string; intent: string; }[]>([]);
 const isLoading = ref(false);
 const apiUrl = import.meta.env.VITE_API_URL;
 
