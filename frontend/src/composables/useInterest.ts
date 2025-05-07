@@ -36,6 +36,51 @@ async function fetchTopicSummary(combined_summaries: String) {
         //const data = "Graph Neural Nework is a type of neural network that operates on graph data structures. It is designed to learn from the relationships and connections between nodes in a graph, making it suitable for tasks such as node classification, link prediction, and graph classification. GNNs have applications in various fields, including social network analysis, recommendation systems, and molecular chemistry.";
 }
 
+async function checkAndHandleHistory(user_id: string, topic: string, current_date: Date): Promise<{ initialized: boolean; data: any }> {
+  try {
+    // Check if history exists
+    console.log("Checking if history exists for user:", user_id, "and topic:", topic);
+    const getResponse = await axios.get(`${apiUrl}/articles/history`, {
+      params: {
+        user_id: user_id,
+        topic: topic,
+        level: currentInterest.value.level,
+      },
+    });
+
+    if (getResponse.data && getResponse.data.length > 0) {
+      console.log("History exists. Updating history...");
+
+      // Update history with a PUT request
+      const putResponse = await axios.put(`${apiUrl}/articles/history`, {
+        user_id: user_id,
+        topic: topic,
+        current_date: current_date.toISOString(),
+        level: currentInterest.value.level,
+      });
+
+      console.log("History updated:", putResponse.data);
+      return { initialized: false, data: putResponse.data }; // Return updated history with initialized = false
+    } else {
+      console.log("No history found. Initializing history...");
+
+      // Initialize history with a POST request
+      const postResponse = await axios.post(`${apiUrl}/articles/history`, {
+        user_id: user_id,
+        topic: topic,
+        current_date: current_date.toISOString(),
+        level: currentInterest.value.level,
+      });
+
+      console.log("History initialized:", postResponse.data);
+      return { initialized: true, data: postResponse.data }; // Return initialized history with initialized = true
+    }
+  } catch (error) {
+    console.error("Error checking or handling history:", error);
+    return { initialized: false, data: null }; // Return null data in case of an error
+  }
+}
+
 async function fetchRelatedArticles(currentDate: Date) {
   if (!currentInterest.value.topic) {
     console.warn("Topic is empty. Skipping fetch.");
@@ -61,10 +106,11 @@ async function fetchRelatedArticles(currentDate: Date) {
 
 
 export function useInterest() {
-    return {
-      currentInterest,
-      setCurrentInterest,
-      fetchRelatedArticles,
-      fetchTopicSummary,
-    };
+  return {
+    currentInterest,
+    setCurrentInterest,
+    fetchRelatedArticles,
+    fetchTopicSummary,
+    checkAndHandleHistory,
+  };
 }

@@ -75,7 +75,7 @@ import axios from 'axios';
 
 
 const { user } = useUser();
-const { currentInterest, setCurrentInterest, fetchTopicSummary, fetchRelatedArticles } = useInterest();
+const { currentInterest, setCurrentInterest, fetchTopicSummary, fetchRelatedArticles, checkAndHandleHistory } = useInterest();
 const { currentDate } = useCurrentDate();
 const summary = ref('');
 const news = ref<{ title: string; summary: string; url: string }[]>([]);
@@ -94,10 +94,10 @@ const menuItems = computed(() => {
       });
       
       if (currentDate.value) {
-          isLoading.value = true;
-          fetchRelatedArticles(currentDate.value).then((result) => {
-          news.value = result;
-          console.log('Fetched news:', result);
+        isLoading.value = true;
+        checkAndHandleHistory(user.value.id, interest.topic, currentDate.value).then((result) => {
+          news.value = result.data;
+          console.log('Fetched news:', news.value);
           const summaries = news.value.map((article) => article.summary);
           console.log('Summaries:', summaries);
           const combined_summaries = summaries.join("\n\n");

@@ -449,9 +449,14 @@ def get_related_articles(topic: str, before_date: str, level: str):
     return articles
 
 class HistoryResource(Resource):
-    def post(self, user_id, topic):
+    def post(self):
         data = request.json
         date = data.get("current_date")
+        user_id = data.get("user_id")
+        topic = data.get("topic")
+        level = data.get("level")
+
+        print(f"User ID: {user_id}, Topic: {topic}, Date: {date}, Level: {level}")
         
         # Retrieve all article embeddings from given topic the tiven user is subscribed to
         query = """
@@ -469,7 +474,7 @@ class HistoryResource(Resource):
         print(f"Number of articles retrieved: {len(result)}")
         print (f"Embeddings shape: {embeddings.shape}")
 
-        select_indices = select_dissimilar_embeddings(embeddings, 25) # k = 25 = history size limit
+        select_indices = select_dissimilar_embeddings(embeddings, 10) # k = 10 = history size limit
         selected_articles = [result[i] for i in select_indices]
 
         # Add LAST_QUERY relationship for each selected article's topic
@@ -495,14 +500,21 @@ class HistoryResource(Resource):
                 "link": record["link"],
                 "title": record["title"],
                 "description": record["description"],
-                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S")
+                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
             }
             for record in selected_articles
         ]
 
         return make_response(jsonify(articles), 201)
 
-    def get(self, user_id, topic):
+    def get(self):
+        data = request.args
+        user_id = data.get("user_id")
+        topic = data.get("topic")
+        level = data.get("level")
+        print(f"User ID: {user_id}, Topic: {topic}, Level: {level}")
+
         # Retrieve all articles related to topic that was last queried by the user
         query = """
         MATCH (user:User {id: $user_id})-[:LAST_QUERY]->(topic:Topic {name: $topic})<-[:RELATED_TO]-(article:Article)
@@ -517,15 +529,22 @@ class HistoryResource(Resource):
                 "title": record["title"],
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
             }
             for record in history
         ]
 
+        print(f"Articles: {articles}")
+
         return make_response(jsonify(articles), 201)
     
-    def put(self, user_id, topic):
+    def put(self):
         data = request.json
         date = data.get("current_date")
+        user_id = data.get("user_id")
+        topic = data.get("topic")
+        level = data.get("level")
+        print(f"User ID: {user_id}, Topic: {topic}, Date: {date}, Level: {level}")
 
         # get the date of the last query for the given topic
         query = """
@@ -552,15 +571,7 @@ class HistoryResource(Resource):
 
         # if there are no new articles
         if(len(new_embeddings) == 0):
-            articles = [
-                {
-                    "link": record["link"],
-                    "title": record["title"],
-                    "description": record["description"],
-                    "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                } for record in new_history
-            ]
-            return make_response(jsonify(articles), 202)
+            return make_response(jsonify([]), 202)
 
 
         # get the articles from the history that are related to the topic
@@ -574,7 +585,7 @@ class HistoryResource(Resource):
         all_articles = history + new_result
         all_embeddings = np.concatenate((history_embeddings, new_embeddings), axis=0)
 
-        dissimilar_indices = select_dissimilar_embeddings(all_embeddings, 25) # k = 25 = history size limit
+        dissimilar_indices = select_dissimilar_embeddings(all_embeddings, 10) # k = 25 = history size limit
         new_history = [all_articles[i] for i in dissimilar_indices]
 
         # Add LAST_QUERY relationship for each selected article's topic
@@ -601,12 +612,12 @@ class HistoryResource(Resource):
                 "title": record["title"],
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
             }
-            for record in new_history
+            for record in new_result # only returns the new articles that were added to the history
         ]
 
         return make_response(jsonify(articles), 201)
-
 
 api.add_resource(HistoryResource, "/articles/history")
 
