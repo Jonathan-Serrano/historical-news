@@ -374,7 +374,7 @@ meta_summary_prompt = ChatPromptTemplate(
 meta_summary_chain = meta_summary_prompt | llm
 
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
-embedding_dimension = 4096
+embedding_dimension = 378
 def get_related_articles(topic: str, before_date: str, level: str):
     if (level == "Beginner"):
         level = "middle schooler who is just starting to learn about the topic and wants to understand the basics"
@@ -474,7 +474,7 @@ class HistoryResource(Resource):
         print(f"Number of articles retrieved: {len(result)}")
         print (f"Embeddings shape: {embeddings.shape}")
 
-        select_indices = select_dissimilar_embeddings(embeddings, 10) # k = 10 = history size limit
+        select_indices = select_dissimilar_embeddings(embeddings, 5) # k = 10 = history size limit
         selected_articles = [result[i] for i in select_indices]
 
         # Add LAST_QUERY relationship for each selected article's topic
@@ -571,6 +571,7 @@ class HistoryResource(Resource):
         RETURN article.embedding AS embedding, elementId(article) as elementId, article.link AS link,
                article.title AS title, article.description AS description, article.pubDate AS pubDate
         ORDER BY article.pubDate DESC
+        LIMIT 10
         """
         new_result = neo4j_graph.query(query, {"user_id": user_id, "topic": topic, "prev_date": prev_date})
         new_embeddings = np.array([article["embedding"] for article in new_result])
@@ -591,7 +592,7 @@ class HistoryResource(Resource):
         all_articles = history + new_result
         all_embeddings = np.concatenate((history_embeddings, new_embeddings), axis=0)
 
-        dissimilar_indices = select_dissimilar_embeddings(all_embeddings, 10) # k = 25 = history size limit
+        dissimilar_indices = select_dissimilar_embeddings(all_embeddings, 5) # k = 25 = history size limit
         new_history = [all_articles[i] for i in dissimilar_indices]
 
         # Add LAST_QUERY relationship for each selected article's topic

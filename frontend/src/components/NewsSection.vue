@@ -34,14 +34,6 @@
       </div>
     </section>
     <section>
-      <h3 class="text-lg font-semibold mb-2">Since you are unfamiliar with this topic</h3>
-      <p class="mb-4">{{ historicalSummary }}</p>
-      <Accordion :activeIndex="0">
-        <AccordionTab v-for="(newsItem, index) in historicalNews" :key="index" :header="newsItem.title">
-          <p>{{ newsItem.summary }}</p>
-          <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.link)" class="mt-2" />
-        </AccordionTab>
-      </Accordion>
       <div class="mt-4 flex flex-col gap-2" v-if="seedTopics.length > 0">
         <h3 class="text-lg font-semibold mb-2">Recommended Topics to Explore for Starter!</h3>
         <Message severity="info" class="mb-2">These topics are generated from CELF Influence Maximization algorithm</Message>

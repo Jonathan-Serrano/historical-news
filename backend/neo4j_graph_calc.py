@@ -44,11 +44,11 @@ def register_graph(graph_name: str):
         {
             RELATED_TO: {
             type: 'RELATED_TO',
-            orientation: 'UNDIRECTED',
+            orientation: 'UNDIRECTED'
             },
             COMES_FROM: {
             type: 'COMES_FROM',
-            orientation: 'UNDIRECTED',
+            orientation: 'UNDIRECTED'
             }
         }
         )
