@@ -38,6 +38,7 @@ python app.py
 ```bash
 # Remember to download OLLAMA at https://ollama.com/download
 ollama serve
+ollama pull mistral
 ollama pull llama3.2
 ollama pull nomic-embed-text
 ```
