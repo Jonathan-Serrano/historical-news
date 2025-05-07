@@ -174,6 +174,19 @@ class UserInterestResource(Resource):
         neo4j_graph.query(query, {"user_id": user_id, "topic_name": topic_name})
 
         return make_response(jsonify({"message": "Interest removed successfully!"}), 200)
+    
+    def get(self, user_id):
+        # Get all topics the user is subscribed to
+        query = """
+        MATCH (user:User {id: $user_id})-[:SUBSCRIBED_TO]->(topic:Topic)
+        OPTIONAL MATCH (user)-[r:LEVEL_OF_UNDERSTANDING]->(topic)
+        RETURN topic.name AS name, r.level AS level
+        """
+        result = neo4j_graph.query(query, {"user_id": user_id})
+        topics = [
+            {"topic": record["name"], "level": record["level"]} for record in result
+        ]
+        return make_response(jsonify(topics), 200)
 
 
 class UserArticleResource(Resource):

@@ -95,7 +95,12 @@ async function addInterest() {
         topic_name: newInterest.value,
         level: newLevel.value
       });
-      user.value.interests.push({ topic: newInterest.value, level: newLevel.value });
+      const response = await axios.get(`${apiUrl}/user/${user.value.id}/interest`);
+      if (response.data) {
+        user.value.interests = response.data;
+      } else {
+        console.error('No interests found');
+      }
       newInterest.value = '';
       newLevel.value = '';
     } catch (error) {
@@ -110,7 +115,14 @@ async function removeInterest(index: number) {
     await axios.delete(`${apiUrl}/user/${user.value.id}/interest`, {
       data: { topic_name: interest.topic }
     });
-    user.value.interests.splice(index, 1);
+    const response = await axios.get(`${apiUrl}/user/${user.value.id}/interest`);
+    if (response.data) {
+      user.value.interests = response.data;
+    } else {
+      console.error('No interests found');
+    }
+
+
   } catch (error) {
     console.error('Error removing interest:', error);
   }
