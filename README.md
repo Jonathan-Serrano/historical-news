@@ -116,7 +116,7 @@ Our project is built using a modern and modular tech stack:
 - [Node.js](https://nodejs.org/) (v18+)
 - [Python](https://www.python.org/downloads/) (v3.10+)
 - [Ollama](https://ollama.com/download)
-- [Neo4j Desktop or Aura](https://neo4j.com/)
+- [Neo4j Desktop](https://neo4j.com/)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop)
 
 ## Getting Started
