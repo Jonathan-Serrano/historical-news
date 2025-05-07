@@ -111,7 +111,7 @@ Our project is built using a modern and modular tech stack:
 - **GenAI Pipeline**: [LangChain](https://www.langchain.com/) for structured prompting, RAG, and LLM workflow management
 - **Embeddings**: Generated using `nomic-embed-text` for scalable vector representation of articles
 
-https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/vue_js.png
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/vue_js.png">
 
 ## Prerequisites
 
