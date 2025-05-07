@@ -495,16 +495,19 @@ class HistoryResource(Resource):
             "date": date
         })
 
-        articles = [
-            {
-                "link": record["link"],
-                "title": record["title"],
-                "description": record["description"],
-                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
-            }
-            for record in selected_articles
-        ]
+        articles = []
+        for record in selected_articles:
+            response = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})
+            articles.append(
+                {
+                    "link": record["link"],
+                    "title": record["title"],
+                    "description": record["description"],
+                    "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                    "summary": response["summary"],
+                    "intent": response["intent"],
+                }
+            )
 
         return make_response(jsonify(articles), 201)
 
@@ -523,16 +526,19 @@ class HistoryResource(Resource):
         """
 
         history = neo4j_graph.query(query, {"user_id": user_id, "topic": topic})
-        articles = [
-            {
-                "link": record["link"],
-                "title": record["title"],
-                "description": record["description"],
-                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
-            }
-            for record in history
-        ]
+        articles = []
+        for record in history:
+            response = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})
+            articles.append(
+                {
+                    "link": record["link"],
+                    "title": record["title"],
+                    "description": record["description"],
+                    "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                    "summary": response["summary"],
+                    "intent": response["intent"],
+                }
+            )
 
         print(f"Articles: {articles}")
 
@@ -606,16 +612,19 @@ class HistoryResource(Resource):
             "date": date
         })
 
-        articles = [
-            {
-                "link": record["link"],
-                "title": record["title"],
-                "description": record["description"],
-                "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "summary": summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})["summmary"],
-            }
-            for record in new_result # only returns the new articles that were added to the history
-        ]
+        articles = []
+        for record in new_result: # only returns the new articles that were added to the history
+            response = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})
+            articles.append(
+                {
+                    "link": record["link"],
+                    "title": record["title"],
+                    "description": record["description"],
+                    "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
+                    "summary": response["summary"],
+                    "intent": response["intent"],
+                }
+            )
 
         return make_response(jsonify(articles), 201)
 
