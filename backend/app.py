@@ -6,8 +6,10 @@ from neo4j.time import DateTime as Neo4jDateTime
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain.prompts import ChatPromptTemplate
+from pydantic import BaseModel
 from tqdm import tqdm
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
@@ -320,18 +322,44 @@ class ArticleTopicResource(Resource):
 api.add_resource(ArticleTopicResource, "/articles/topic")
 
 llm = ChatOllama(model="mistral", temperature=0.7, num_predict=256)
-summary_prompt = ChatPromptTemplate.from_messages(
-    [
+
+class ArticleAnalysis(BaseModel):
+    summary: str
+    intent: str
+
+parser = JsonOutputParser(pydantic_object=ArticleAnalysis)
+
+summary_prompt = ChatPromptTemplate(
+    messages=[
         (
             "system",
-            "You are a {role}. You are generating concise and accurate summaries based on the information found in the text and a provided topic",
+            "You are an expert media analyst generating concise and accurate summaries based on the information found in the text and a provided topic",
         ),
-        ("human", "Generate a summary of the following input: {question} based on the topic of {topic} and explain it like you would to a {level}. Do not include any extra text or headings—just return the summary.\nSummary:"),
-    ]
-)
-summary_chain = summary_prompt | llm
+        (
+            "human",
+            """
+            You will perform two tasks based on the following input:
 
-meta_summary_prompt = ChatPromptTemplate.from_messages(
+            {question}
+
+            1. Generate a summary based on the topic of {topic}:
+
+            2. Classify the intent as one of:
+               - Inform
+               - Persuade
+               - Manipulate
+               - Mislead
+               - Satirize
+
+            {format_instructions}
+        """,
+        ),
+    ],
+    partial_variables={"format_instructions": parser.get_format_instructions()},
+)
+summary_chain = summary_prompt | llm | parser
+
+meta_summary_prompt = ChatPromptTemplate(
     [
         (
             "system",
@@ -383,7 +411,7 @@ def get_related_articles(topic: str, before_date: str, level: str):
 
     articles = []
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level, "role": role}).content
+        response_dict = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level})
         articles.append(
             {
                 "link": record["link"],
@@ -391,7 +419,8 @@ def get_related_articles(topic: str, before_date: str, level: str):
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
                 "score": record["score"],
-                "summary": summary,
+                "summary": response_dict["summary"],
+                "intent": response_dict["intent"],
             }
         )
 
@@ -403,9 +432,9 @@ def get_related_articles(topic: str, before_date: str, level: str):
         },
     )
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke(
-            {"question": record["title"] + record["description"], "topic": topic, "level": level, "role": role}
-        ).content
+        response_dict = summary_chain.invoke(
+            {"question": record["title"] + record["description"], "topic": topic, "level": level}
+        )
         articles.append(
             {
                 "link": record["link"],
@@ -413,7 +442,8 @@ def get_related_articles(topic: str, before_date: str, level: str):
                 "description": record["description"],
                 "pubDate": record["pubDate"].strftime("%Y-%m-%dT%H:%M:%S"),
                 "score": record["score"],
-                "summary": summary,
+                "summary": response_dict["summary"],
+                "intent": response_dict["intent"],
             }
         )
     return articles
