@@ -26,7 +26,7 @@ For **returning users**, a summarization of new articles is provided, ensuring t
   - **CELF Influence Maximization**
 
 ### Summarization System
-- Utilizes **Ollama (LLaMA 3.2)** for summarizing articles via role-based prompting.
+- Utilizes **Ollama (Mistral)** for summarizing articles via role-based prompting.
 - Maintains **history-based summaries** using Max-Min greedy selection to track topic updates over time.
 
 ### Intent Detection
@@ -106,7 +106,7 @@ Our project is built using a modern and modular tech stack:
 
 - **Frontend**: Vue.js with Tailwind CSS and PrimeVue for a responsive, interactive UI
 - **Backend**: Python with Flask for API services and integration
-- **Local LLMs**: Served via [Ollama](https://ollama.com/) using open-source [LLaMA 3.2](https://ollama.com/library/llama3) models
+- **Local LLMs**: Served via [Ollama](https://ollama.com/) using open-source [Mistral](https://ollama.com/library/mistral) models
 - **Graph Database**: [Neo4j](https://neo4j.com/) for knowledge grounding, topic linkage, and graph-based querying
 - **GenAI Pipeline**: [LangChain](https://www.langchain.com/) for structured prompting, RAG, and LLM workflow management
 - **Embeddings**: Generated using `nomic-embed-text` for scalable vector representation of articles
@@ -138,7 +138,6 @@ python app.py
 # Remember to download OLLAMA at https://ollama.com/download
 ollama serve
 ollama pull mistral
-ollama pull llama3.2
 ollama pull nomic-embed-text
 ```
 
@@ -172,8 +171,6 @@ npm run dev
     NEO4J_URI=bolt://localhost:7687
     NEO4J_USER=neo4j
     NEO4J_PASSWORD=your_password
-
-    LLM_MODEL=llama3.2
     PORT=5000
     ```
 
