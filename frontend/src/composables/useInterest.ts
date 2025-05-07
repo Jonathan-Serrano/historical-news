@@ -20,11 +20,9 @@ async function fetchTopicSummary(combined_summaries: String) {
             return "";
         }
         try {
-            const response = await axios.get(`${apiUrl}/summarize_all_articles`, {
-                params: {
-                    topic: currentInterest.value.topic,
-                    combined_summaries: combined_summaries,
-                },
+            const response = await axios.post(`${apiUrl}/summarize_all_articles`,{
+              topic: currentInterest.value.topic,
+              combined_summaries: combined_summaries,
             });
             console.log("Topic summary response:", response.data);
             return response.data;

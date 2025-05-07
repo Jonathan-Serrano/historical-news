@@ -231,17 +231,21 @@ class InterestResource(Resource):
     
 
 class SummarizeAllArticlesResource(Resource):
-    def get(self):
-        summaries = request.args.get("combined_summaries")  
-        topic = request.args.get("topic")
+    def post(self):
+        data = request.get_json()
+        topic = data.get("topic")
+        summaries = data.get("combined_summaries")
         if not summaries:
             return make_response(jsonify({"error": "No summaries provided"}), 400)
         if not topic:
             return make_response(jsonify({"error": "No topic provided"}), 400)
         # Generate meta-summary
-        summary_ret = meta_summary_chain.invoke({"summaries": summaries, "topic": topic}).content
+        role = "A journalist whose sole job is to write a summary of multiple articles and want to make sure that the summary is accurate and informative" 
+
+        summary_ret = meta_summary_chain.invoke({"summaries": summaries, "topic": topic, "role": role}).content
         
         return summary_ret
+        
 
 
 api.add_resource(UserResource, "/user")
@@ -276,9 +280,9 @@ summary_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are generating concise and accurate summaries based on the information found in the text and a provided topic",
+            "You are a {role}. You are generating concise and accurate summaries based on the information found in the text and a provided topic",
         ),
-        ("human", "Generate a summary of the following input: {question} based on the topic of {topic} and explain it at a {level} level. Return just the summary.\nSummary:"),
+        ("human", "Generate a summary of the following input: {question} based on the topic of {topic} and explain it like you would to a {level}. Do not include any extra text or headings—just return the summary.\nSummary:"),
     ]
 )
 summary_chain = summary_prompt | llm
@@ -287,7 +291,7 @@ meta_summary_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are generating a meta-summary from multiple summaries about a given topic.",
+            "You are a {role}. You are generating an overall summary from multiple summaries about a given topic.",
         ),
         (
             "human",
@@ -300,6 +304,13 @@ meta_summary_chain = meta_summary_prompt | llm
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
 embedding_dimension = 4096
 def get_related_articles(topic: str, before_date: str, level: str):
+    if (level == "Beginner"):
+        level = "middle schooler who is just starting to learn about the topic and wants to understand the basics"
+    elif (level == "Intermediate"):
+        level = "graduate student who has some knowledge about the topic and wants to learn more advanced concepts"
+    elif (level == "Expert"):
+        level = "Industry profession in the domain who is well-versed in the topic and wants to explore a deeper understanding"
+    role = "A journalist whose sole job is to make summaries of articles and want to make sure that the summary is accurate and informative" 
     query = """
         WITH $topic_embedding AS topic_vector
         CALL db.index.vector.queryNodes('article_vectors', 5, topic_vector) YIELD node, score
@@ -328,7 +339,7 @@ def get_related_articles(topic: str, before_date: str, level: str):
 
     articles = []
     for record in tqdm(result, desc="Processing articles", unit="article"):
-        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level}).content
+        summary = summary_chain.invoke({"question": record["title"] + record["description"], "topic": topic, "level": level, "role": role}).content
         articles.append(
             {
                 "link": record["link"],
@@ -349,7 +360,7 @@ def get_related_articles(topic: str, before_date: str, level: str):
     )
     for record in tqdm(result, desc="Processing articles", unit="article"):
         summary = summary_chain.invoke(
-            {"question": record["title"] + record["description"], "topic": topic, "level": level}
+            {"question": record["title"] + record["description"], "topic": topic, "level": level, "role": role}
         ).content
         articles.append(
             {
