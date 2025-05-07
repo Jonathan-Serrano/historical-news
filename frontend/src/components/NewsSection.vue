@@ -15,9 +15,21 @@
         <AccordionTab v-for="(newsItem, index) in news" :key="index" :header="newsItem.title">
             <p v-if="!isLoading">{{ newsItem.summary }}</p>
             <i v-else class="pi pi-spin pi-spinner"></i>
-          <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.url)" class="mt-2" />
+          <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.link)" class="mt-2" />
         </AccordionTab>
       </Accordion>
+      <div class="mt-4 flex flex-col gap-2" v-if="suggestedTopics.length > 0">
+        <h3 class="text-lg font-semibold mb-2">Recommended Topics based on your current Topics</h3>
+        <Message severity="info" class="mb-2">These topics are generated from Jaccard Similarity score</Message>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button
+            v-for="(topic, index) in suggestedTopics"
+            :key="index"
+            :label="topic"
+            @click="confirmAddTopic(topic)"
+          />
+        </div>
+      </div>
     </section>
     <section>
       <h3 class="text-lg font-semibold mb-2">Since you are unfamiliar with this topic</h3>
@@ -25,16 +37,20 @@
       <Accordion :activeIndex="0">
         <AccordionTab v-for="(newsItem, index) in historicalNews" :key="index" :header="newsItem.title">
           <p>{{ newsItem.summary }}</p>
-          <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.url)" class="mt-2" />
+          <Button icon="pi pi-external-link" label="Read more" @click="goToArticle(newsItem.link)" class="mt-2" />
         </AccordionTab>
       </Accordion>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <Button
-          v-for="(topic, index) in suggestedTopics"
-          :key="index"
-          :label="topic"
-          @click="confirmAddTopic(topic)"
-        />
+      <div class="mt-4 flex flex-col gap-2" v-if="seedTopics.length > 0">
+        <h3 class="text-lg font-semibold mb-2">Recommended Topics to Explore for Starter!</h3>
+        <Message severity="info" class="mb-2">These topics are generated from CELF Influence Maximization algorithm</Message>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button
+            v-for="(topic, index) in seedTopics"
+            :key="index"
+            :label="topic"
+            @click="confirmAddTopic(topic)"
+          />
+        </div>
       </div>
     </section>
     <ConfirmPopup />
@@ -43,7 +59,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { historicalNews, historicalSummary, suggestedTopics } from '../data/news';
+import { historicalNews, historicalSummary } from '../data/news';
 import Menubar from 'primevue/menubar';
 import Accordion from 'primevue/accordion';
 import AccordionTab from 'primevue/accordiontab';
@@ -54,6 +70,8 @@ import { useUser } from '../composables/useUser';
 import Message from 'primevue/message';
 import { useInterest } from '../composables/useInterest';
 import { useCurrentDate } from '../composables/useDate';
+import { onMounted } from 'vue';
+import axios from 'axios';
 
 
 const { user } = useUser();
@@ -62,6 +80,7 @@ const { currentDate } = useCurrentDate();
 const summary = ref('');
 const news = ref<{ title: string; summary: string; url: string }[]>([]);
 const isLoading = ref(false);
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const menuItems = computed(() => {
   return user.value.interests.map((interest) => ({
@@ -69,6 +88,10 @@ const menuItems = computed(() => {
     icon: 'pi pi-fw pi-tag',
     command: () => {
       setCurrentInterest(interest.topic, interest.level);
+      fetchRelatedTopics(interest.topic, user.value.id).then((result) => {
+        suggestedTopics.value = result;
+        console.log('Suggested topics:', result);
+      });
       
       if (currentDate.value) {
           isLoading.value = true;
@@ -92,7 +115,7 @@ const menuItems = computed(() => {
 const confirm = useConfirm();
 
 function goToArticle(url: string) {
-  window.open(url, '_blank');
+  window.open(url);
 }
 
 function confirmAddTopic(topic: string) {
@@ -108,4 +131,36 @@ function confirmAddTopic(topic: string) {
     },
   });
 }
+
+async function fetchSeedTopics(): Promise<string[]> {
+  try {
+    const response = await axios.get(`${apiUrl}/topic/get_seed`);
+    console.log("Seed topics response:", response.data);
+    const seedTopics = response.data.map((topic: { name: string }) => topic.name);
+    console.log("Seed topics:", seedTopics);
+    return seedTopics;
+  } catch (error) {
+    console.error("Error fetching seed topics:", error);
+    return [];
+  }
+}
+
+async function fetchRelatedTopics(topicName: string, userId: string): Promise<string[]> {
+  try {
+    const response = await axios.get(`${apiUrl}/topic/${topicName}?id=${userId}`);
+    const relatedTopics = response.data.map((topic: { name: string }) => topic.name);
+    return relatedTopics;
+  } catch (error) {
+    console.error("Error fetching related topics:", error);
+    return [];
+  }
+}
+
+
+const seedTopics = ref<string[]>([]);
+const suggestedTopics = ref<string[]>([]);
+
+onMounted(async () => {
+  seedTopics.value = await fetchSeedTopics();
+});
 </script>

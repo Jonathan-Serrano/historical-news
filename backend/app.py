@@ -29,6 +29,51 @@ CORS(app)
 
 current_date = datetime(2024, 5, 5, 14, 30)
 
+@app.route("/topic/get_seed", methods=["GET"])
+def get_topic_seed():
+    query = """
+    MATCH (n:Topic)
+    WHERE n.celfSpread IS NOT NULL AND n.celfSpread <> 0
+    RETURN n.name AS name, n.celfSpread AS spread
+    ORDER BY spread DESC, name ASC
+    """
+    result = neo4j_graph.query(query)
+    topics = [{"name": record["name"]} for record in result]
+    return make_response(jsonify(topics), 200)
+
+
+@app.route("/topic/<string:topic_name>", methods=["GET"])
+def get_related_topics(topic_name):
+    user_id = request.args.get("id")
+    if not user_id:
+        return make_response(jsonify({"error": "Missing user_id"}), 400)
+
+    query = """
+    MATCH (u:User {id: $user_id})-[:SUBSCRIBED_TO]->(subscribed:Topic)
+    WITH u, collect(subscribed.name) AS subscribed_names
+    MATCH (t:Topic {name: $topic_name})-[s:SIMILAR]-(other:Topic)
+    WHERE NOT other.name IN subscribed_names
+    RETURN other.name AS name, s.score AS score
+    ORDER BY s.score DESC
+    LIMIT 5
+    """
+    result = neo4j_graph.query(
+        query,
+        {
+            "topic_name": topic_name,
+            "user_id": user_id,
+        },
+    )
+    
+    seen = set()
+    topics = []
+    for record in result:
+        if record["name"] not in seen:
+            seen.add(record["name"])
+            topics.append({"name": record["name"], "score": record["score"]})
+            
+    return make_response(jsonify(topics), 200)
+
 
 class DateResource(Resource):
     def get(self):
@@ -228,7 +273,7 @@ class InterestResource(Resource):
         result = neo4j_graph.query(query)
         topics = [record["name"] for record in result]
         return make_response(jsonify(topics), 200)
-    
+
 
 class SummarizeAllArticlesResource(Resource):
     def post(self):
@@ -562,8 +607,6 @@ def select_dissimilar_embeddings(embeddings: np.ndarray, k):
 
     return selected  # indices of selected embeddings
 
-
-        
 
 if __name__ == "__main__":
     app.run(debug=True)

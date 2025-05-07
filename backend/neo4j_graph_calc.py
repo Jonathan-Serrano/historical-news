@@ -58,6 +58,6 @@ def register_graph(graph_name: str):
     return True
 
 graph_name = "newsGraph"
-# register_graph(graph_name)
+register_graph(graph_name)
 generate_seed_topic(graph_name)
 generate_similarity(graph_name)
