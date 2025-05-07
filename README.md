@@ -110,9 +110,15 @@ Our project is built using a modern and modular tech stack:
 - **Graph Database**: [Neo4j](https://neo4j.com/) for knowledge grounding, topic linkage, and graph-based querying
 - **GenAI Pipeline**: [LangChain](https://www.langchain.com/) for structured prompting, RAG, and LLM workflow management
 - **Embeddings**: Generated using `nomic-embed-text` for scalable vector representation of articles
+- 
 <div align-"center">
 <img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/vue_js.png">
 <img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/tailwind_css.png">
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/flask.png">
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/neo4j.png">
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/node_js.png">
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/docker.png">
+<img width="50" src="https://brandlogos.net/wp-content/uploads/2025/03/langchain-logo_brandlogos.net_9zgaw.png">
 </div>
 
 ## Prerequisites
