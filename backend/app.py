@@ -290,7 +290,6 @@ class SummarizeAllArticlesResource(Resource):
         summary_ret = meta_summary_chain.invoke({"summaries": summaries, "topic": topic, "role": role}).content
         
         return summary_ret
-        
 
 
 api.add_resource(UserResource, "/user")
@@ -320,7 +319,7 @@ class ArticleTopicResource(Resource):
 
 api.add_resource(ArticleTopicResource, "/articles/topic")
 
-llm = ChatOllama(model="llama3.2", temperature=0.7, num_predict=256)
+llm = ChatOllama(model="mistral", temperature=0.7, num_predict=256)
 summary_prompt = ChatPromptTemplate.from_messages(
     [
         (
