@@ -112,6 +112,7 @@ Our project is built using a modern and modular tech stack:
 - **Embeddings**: Generated using `nomic-embed-text` for scalable vector representation of articles
 
 <img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/vue_js.png">
+<img height="50" src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/tailwind_css.png">
 
 ## Prerequisites
 
